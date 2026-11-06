@@ -279,6 +279,136 @@
     line-height: 1.4;
   }
 
+  .modes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+  }
+
+  .modes button {
+    font-family: inherit;
+    font-size: 0.88rem;
+    padding: 0.45rem 0.95rem;
+    border-radius: 999px;
+    border: 1px solid var(--fog);
+    background: rgba(12, 20, 16, 0.55);
+    color: var(--bone-dim);
+    cursor: pointer;
+  }
+
+  .modes button.active {
+    background: rgba(232, 168, 56, 0.18);
+    border-color: rgba(232, 168, 56, 0.55);
+    color: var(--amber-hot);
+  }
+
+  .modes button:disabled, .filters button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .mode-hint {
+    font-size: 0.88rem;
+    color: var(--bone-dim);
+    text-align: center;
+    font-style: italic;
+    max-width: 28rem;
+  }
+
+  .player-panel {
+    width: min(24rem, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .player-panel.hidden { display: none; }
+
+  .player-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .player-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.4rem 0.7rem;
+    border-radius: 0.65rem;
+    background: rgba(12, 20, 16, 0.65);
+    border: 1px solid var(--fog);
+  }
+
+  .player-list .who { color: var(--bone); }
+  .player-list button {
+    font-family: inherit;
+    font-size: 0.75rem;
+    border: 0;
+    background: transparent;
+    color: var(--bone-dim);
+    cursor: pointer;
+  }
+
+  .add-player {
+    display: flex;
+    gap: 0.4rem;
+  }
+
+  .add-player input {
+    flex: 1;
+    min-width: 0;
+    font-family: inherit;
+    font-size: 0.95rem;
+    padding: 0.5rem 0.7rem;
+    border-radius: 0.65rem;
+    border: 1px solid var(--fog);
+    background: rgba(12, 20, 16, 0.7);
+    color: var(--bone);
+  }
+
+  .add-player button {
+    font-family: inherit;
+    font-size: 0.88rem;
+    padding: 0.5rem 0.8rem;
+    border-radius: 0.65rem;
+    border: 1px solid rgba(232, 168, 56, 0.4);
+    background: rgba(232, 168, 56, 0.16);
+    color: var(--amber-hot);
+    cursor: pointer;
+  }
+
+  .roster {
+    width: 100%;
+    margin-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    text-align: left;
+  }
+
+  .roster:empty { display: none; }
+
+  .roster .row {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.45rem 0.7rem;
+    border-radius: 0.65rem;
+    background: rgba(12, 20, 16, 0.55);
+    border: 1px solid var(--fog);
+    font-size: 0.95rem;
+  }
+
+  .roster .row .who { color: var(--bone-dim); }
+  .roster .row .dino { color: var(--bone); font-weight: 700; }
+  .roster .row.carnivore { border-color: rgba(196, 69, 45, 0.4); }
+  .roster .row.herbivore { border-color: rgba(61, 139, 90, 0.4); }
+  .roster .row.omnivore { border-color: rgba(232, 168, 56, 0.4); }
+
   .footer {
     margin-top: 0.5rem;
     font-size: 0.72rem;
@@ -306,6 +436,19 @@
     <button type="button" data-filter="omnivore">Omnivores</button>
   </div>
 
+  <div class="modes" role="group" aria-label="Spin mode">
+    <button type="button" data-mode="together" class="active">Together</button>
+    <button type="button" data-mode="apart">Each player</button>
+  </div>
+  <p class="mode-hint" id="modeHint">One spin, one dino for the whole group.</p>
+  <div id="playerPanel" class="player-panel hidden">
+    <ul id="playerList" class="player-list"></ul>
+    <form id="addPlayerForm" class="add-player">
+      <input type="text" id="playerName" maxlength="24" placeholder="Add a player name" autocomplete="off" />
+      <button type="submit">Add</button>
+    </form>
+  </div>
+
   <div class="stage">
     <div class="pointer" aria-hidden="true"></div>
     <canvas id="wheel" width="840" height="840" aria-label="Dinosaur spin wheel"></canvas>
@@ -318,6 +461,7 @@
       <div class="diet-tag"></div>
       <div class="name"></div>
       <div class="flavor"></div>
+      <div id="roster" class="roster"></div>
     </div>
   </div>
 
@@ -363,13 +507,78 @@
   const ctx = canvas.getContext("2d");
   const spinBtn = document.getElementById("spinBtn");
   const resultEl = document.getElementById("result");
+  const rosterEl = document.getElementById("roster");
   const filterBtns = document.querySelectorAll(".filters button");
+  const modeBtns = document.querySelectorAll(".modes button");
+  const modeHint = document.getElementById("modeHint");
+  const playerPanel = document.getElementById("playerPanel");
+  const playerList = document.getElementById("playerList");
+  const addPlayerForm = document.getElementById("addPlayerForm");
+  const playerNameInput = document.getElementById("playerName");
 
   let filter = "all";
+  let mode = "together";
+  let players = [];
   let pool = SPECIES.slice();
   let rotation = 0;
   let spinning = false;
   let animId = null;
+
+  function loadPlayers() {
+    try {
+      const raw = JSON.parse(localStorage.getItem("isleBabesPlayers") || "[]");
+      if (Array.isArray(raw)) {
+        return raw.filter((n) => typeof n === "string" && n.trim()).slice(0, 24);
+      }
+    } catch (err) { /* ignore */ }
+    return [];
+  }
+
+  function savePlayers() {
+    localStorage.setItem("isleBabesPlayers", JSON.stringify(players));
+  }
+
+  function renderPlayers() {
+    playerList.innerHTML = "";
+    players.forEach((name, i) => {
+      const li = document.createElement("li");
+      const who = document.createElement("span");
+      who.className = "who";
+      who.textContent = name;
+      const rm = document.createElement("button");
+      rm.type = "button";
+      rm.textContent = "Remove";
+      rm.addEventListener("click", () => {
+        if (spinning) return;
+        players.splice(i, 1);
+        savePlayers();
+        renderPlayers();
+      });
+      li.appendChild(who);
+      li.appendChild(rm);
+      playerList.appendChild(li);
+    });
+  }
+
+  function applyMode(next) {
+    if (spinning) return;
+    mode = next;
+    modeBtns.forEach((b) => {
+      b.classList.toggle("active", b.dataset.mode === mode);
+    });
+    const apart = mode === "apart";
+    playerPanel.classList.toggle("hidden", !apart);
+    modeHint.textContent = apart
+      ? "Add everyone, then spin. Each player gets their own dino."
+      : "One spin, one dino for the whole group.";
+    spinBtn.textContent = defaultSpinLabel();
+    rosterEl.innerHTML = "";
+    resultEl.classList.remove("show");
+  }
+
+  function defaultSpinLabel() {
+    return mode === "apart" ? "Spin for each player" : "Spin for everyone";
+  }
 
   function getPool() {
     if (filter === "all") return SPECIES.slice();
@@ -458,67 +667,116 @@
     return idx;
   }
 
-  function showResult(sp) {
+  function showResult(sp, label) {
     resultEl.className = "result show " + sp.diet;
-    resultEl.querySelector(".diet-tag").textContent = sp.diet;
+    resultEl.querySelector(".diet-tag").textContent = label || sp.diet;
     resultEl.querySelector(".name").textContent = sp.name;
     resultEl.querySelector(".flavor").textContent = sp.flavor;
+  }
+
+  function renderRoster(rows) {
+    rosterEl.innerHTML = "";
+    (rows || []).forEach((row) => {
+      const el = document.createElement("div");
+      el.className = "row " + row.species.diet;
+      el.innerHTML = "<span class=\"who\"></span><span class=\"dino\"></span>";
+      el.querySelector(".who").textContent = row.player;
+      el.querySelector(".dino").textContent = row.species.name;
+      rosterEl.appendChild(el);
+    });
   }
 
   function setSpinning(on) {
     spinning = on;
     spinBtn.disabled = on;
     filterBtns.forEach((b) => { b.disabled = on; });
-    spinBtn.textContent = on ? "Spinning…" : "Spin again";
+    modeBtns.forEach((b) => { b.disabled = on; });
+    playerNameInput.disabled = on;
+    addPlayerForm.querySelector("button").disabled = on;
+    if (!on) spinBtn.textContent = mode === "apart" ? "Spin again for each" : "Spin again";
   }
 
   function easeOutCubic(t) {
     return 1 - Math.pow(1 - t, 3);
   }
 
-  function spin() {
-    if (spinning || pool.length === 0) return;
-    resultEl.classList.remove("show");
-    setSpinning(true);
+  function spinOnce(durationMs, forced) {
+    return new Promise((resolve) => {
+      const n = pool.length;
+      const slice = (Math.PI * 2) / n;
+      let targetIndex = forced ? pool.findIndex((s) => s.name === forced.name) : -1;
+      if (targetIndex < 0) targetIndex = Math.floor(Math.random() * n);
+      const jitter = (Math.random() - 0.5) * slice * 0.7;
+      const targetLocal = targetIndex * slice + slice / 2 + jitter;
+      const current = ((rotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      const desiredMod = ((-targetLocal) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+      let delta = desiredMod - current;
+      if (delta <= 0) delta += Math.PI * 2;
+      const extraTurns = 4 + Math.floor(Math.random() * 3);
+      delta += extraTurns * Math.PI * 2;
 
-    const n = pool.length;
-    const slice = (Math.PI * 2) / n;
-    const targetIndex = Math.floor(Math.random() * n);
-    // We want winnerIndex() === targetIndex at end.
-    // idx = floor( ((-rot % 2PI)+2PI)%2PI / slice )
-    // So (-rot) mod 2PI should be in [targetIndex*slice, (targetIndex+1)*slice)
-    // Pick center of slice with small jitter
-    const jitter = (Math.random() - 0.5) * slice * 0.7;
-    const targetLocal = targetIndex * slice + slice / 2 + jitter;
-    // (-rot) mod 2PI === targetLocal  =>  rot ≡ -targetLocal (mod 2PI)
-    const current = ((rotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-    const desiredMod = ((-targetLocal) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
-    let delta = desiredMod - current;
-    if (delta <= 0) delta += Math.PI * 2;
-    const extraTurns = 4 + Math.floor(Math.random() * 3); // 4–6 full spins
-    delta += extraTurns * Math.PI * 2;
+      const duration = durationMs || (2500 + Math.random() * 1500);
+      const startRot = rotation;
+      const startTime = performance.now();
 
-    const duration = 2500 + Math.random() * 1500; // 2.5–4s
-    const startRot = rotation;
-    const startTime = performance.now();
-
-    function frame(now) {
-      const t = Math.min(1, (now - startTime) / duration);
-      const e = easeOutCubic(t);
-      rotation = startRot + delta * e;
-      drawWheel();
-      if (t < 1) {
-        animId = requestAnimationFrame(frame);
-      } else {
-        animId = null;
-        const win = pool[winnerIndex()];
-        // Safety: prefer intended target if floating error
-        const intended = pool[targetIndex];
-        showResult(win || intended);
-        setSpinning(false);
+      function frame(now) {
+        const t = Math.min(1, (now - startTime) / duration);
+        rotation = startRot + delta * easeOutCubic(t);
+        drawWheel();
+        if (t < 1) {
+          animId = requestAnimationFrame(frame);
+        } else {
+          animId = null;
+          const win = pool[winnerIndex()] || pool[targetIndex];
+          resolve(win);
+        }
       }
+      animId = requestAnimationFrame(frame);
+    });
+  }
+
+  function pickUnique(available) {
+    if (!available.length) available.push.apply(available, pool);
+    const i = Math.floor(Math.random() * available.length);
+    return available.splice(i, 1)[0];
+  }
+
+  async function spin() {
+    if (spinning || pool.length === 0) return;
+
+    if (mode === "apart" && players.length === 0) {
+      resultEl.className = "result show";
+      resultEl.querySelector(".diet-tag").textContent = "players";
+      resultEl.querySelector(".name").textContent = "Add your names first";
+      resultEl.querySelector(".flavor").textContent = "Then spin so each player gets their own dino.";
+      rosterEl.innerHTML = "";
+      return;
     }
-    animId = requestAnimationFrame(frame);
+
+    setSpinning(true);
+    rosterEl.innerHTML = "";
+
+    if (mode === "together") {
+      resultEl.classList.remove("show");
+      spinBtn.textContent = "Spinning for everyone…";
+      const win = await spinOnce();
+      showResult(win, "Everyone plays");
+      setSpinning(false);
+      return;
+    }
+
+    const available = pool.slice();
+    const rows = [];
+    for (const player of players) {
+      spinBtn.textContent = "Spinning for " + player + "…";
+      resultEl.classList.remove("show");
+      const chosen = pickUnique(available);
+      await spinOnce(2200 + Math.random() * 800, chosen);
+      showResult(chosen, player + " plays");
+      rows.push({ player: player, species: chosen });
+      renderRoster(rows);
+    }
+    setSpinning(false);
   }
 
   function applyFilter(next) {
@@ -530,16 +788,37 @@
     });
     rotation = 0;
     resultEl.classList.remove("show");
-    spinBtn.textContent = "Spin";
+    spinBtn.textContent = defaultSpinLabel();
     drawWheel();
   }
 
   filterBtns.forEach((b) => {
     b.addEventListener("click", () => applyFilter(b.dataset.filter));
   });
+  modeBtns.forEach((b) => {
+    b.addEventListener("click", () => applyMode(b.dataset.mode));
+  });
+  addPlayerForm.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    if (spinning) return;
+    const name = playerNameInput.value.trim();
+    if (!name) return;
+    if (players.some((p) => p.toLowerCase() === name.toLowerCase())) {
+      playerNameInput.value = "";
+      return;
+    }
+    players.push(name);
+    savePlayers();
+    renderPlayers();
+    playerNameInput.value = "";
+    playerNameInput.focus();
+  });
   spinBtn.addEventListener("click", spin);
 
   // Init
+  players = loadPlayers();
+  renderPlayers();
+  applyMode("together");
   pool = getPool();
   drawWheel();
 
