@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>What are we playing? · The Isle Babes Dinorad</title>
+<style>
+  :root {
+    --bg-deep: #0c1410;
+    --bg-mid: #14201a;
+    --amber: #e8a838;
+    --amber-hot: #ffc857;
+    --amber-dim: #a86b1a;
+    --leaf: #3d8b5a;
+    --leaf-bright: #5ecf7a;
+    --blood: #c4452d;
+    --blood-bright: #e85a3c;
+    --bone: #e8dcc8;
+    --bone-dim: #b8a990;
+    --fog: rgba(232, 220, 200, 0.12);
+    --shadow: rgba(0, 0, 0, 0.55);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    min-height: 100%;
+    background:
+      radial-gradient(ellipse 120% 80% at 50% -10%, #1a3024 0%, transparent 55%),
+      radial-gradient(ellipse 60% 40% at 90% 80%, #2a1810 0%, transparent 50%),
+      linear-gradient(165deg, var(--bg-deep) 0%, #0a1210 40%, #151008 100%);
+    color: var(--bone);
+    font-family: Georgia, "Times New Roman", "Palatino Linotype", serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1.25rem 1rem 2.5rem;
+    gap: 1rem;
+  }
+
+  .header {
+    text-align: center;
+    max-width: 36rem;
+  }
+
+  .header .fossil {
+    display: inline-block;
+    font-size: 1.75rem;
+    letter-spacing: 0.35em;
+    opacity: 0.7;
+    margin-bottom: 0.35rem;
+  }
+
+  h1 {
+    font-size: clamp(1.65rem, 5vw, 2.35rem);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--amber-hot);
+    text-shadow: 0 2px 24px rgba(232, 168, 56, 0.35);
+    line-height: 1.15;
+  }
+
+  .subtitle {
+    margin-top: 0.45rem;
+    font-size: 0.95rem;
+    color: var(--bone-dim);
+    font-style: italic;
+  }
+
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+  }
+
+  .filters button {
+    appearance: none;
+    border: 1px solid var(--fog);
+    background: rgba(20, 32, 26, 0.85);
+    color: var(--bone-dim);
+    padding: 0.45rem 0.9rem;
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 0.82rem;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
+  }
+
+  .filters button:hover:not(:disabled) {
+    border-color: var(--amber-dim);
+    color: var(--bone);
+  }
+
+  .filters button.active {
+    background: linear-gradient(135deg, #3a2810, #2a1c0c);
+    border-color: var(--amber);
+    color: var(--amber-hot);
+    box-shadow: 0 0 16px rgba(232, 168, 56, 0.25);
+  }
+
+  .filters button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .stage {
+    position: relative;
+    width: min(92vw, 420px);
+    aspect-ratio: 1;
+    margin: 0.5rem 0;
+  }
+
+  .pointer {
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    width: 0;
+    height: 0;
+    border-left: 14px solid transparent;
+    border-right: 14px solid transparent;
+    border-top: 28px solid var(--amber-hot);
+    filter: drop-shadow(0 3px 6px var(--shadow));
+  }
+
+  .pointer::after {
+    content: "";
+    position: absolute;
+    top: -28px;
+    left: -6px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--amber);
+    box-shadow: 0 0 10px var(--amber);
+  }
+
+  canvas#wheel {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    box-shadow:
+      0 0 0 6px #1e2a22,
+      0 0 0 8px var(--amber-dim),
+      0 12px 40px var(--shadow),
+      inset 0 0 60px rgba(0,0,0,0.35);
+    background: #0a100c;
+  }
+
+  .hub {
+    position: absolute;
+    inset: 42%;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 35% 30%, #3a2a14, #1a140a 70%);
+    border: 3px solid var(--amber);
+    box-shadow: 0 0 20px rgba(232, 168, 56, 0.4);
+    z-index: 3;
+    pointer-events: none;
+    display: grid;
+    place-items: center;
+  }
+
+  .hub span {
+    font-size: clamp(0.9rem, 3vw, 1.15rem);
+    color: var(--amber-hot);
+    letter-spacing: 0.08em;
+  }
+
+  .controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.85rem;
+    width: min(92vw, 420px);
+  }
+
+  #spinBtn {
+    appearance: none;
+    width: 100%;
+    max-width: 280px;
+    padding: 0.95rem 1.5rem;
+    border: none;
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #1a1008;
+    background: linear-gradient(160deg, var(--amber-hot) 0%, var(--amber) 45%, var(--amber-dim) 100%);
+    box-shadow:
+      0 4px 0 #6b4010,
+      0 8px 24px rgba(232, 168, 56, 0.35);
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s, filter 0.15s;
+  }
+
+  #spinBtn:hover:not(:disabled) {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+
+  #spinBtn:active:not(:disabled) {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 #6b4010, 0 4px 12px rgba(232, 168, 56, 0.3);
+  }
+
+  #spinBtn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    filter: grayscale(0.3);
+  }
+
+  .result {
+    width: 100%;
+    min-height: 7.5rem;
+    padding: 1.1rem 1.25rem;
+    border-radius: 1rem;
+    background: rgba(12, 20, 16, 0.75);
+    border: 1px solid var(--fog);
+    text-align: center;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.35s ease, transform 0.35s ease, border-color 0.3s;
+  }
+
+  .result.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .result.carnivore { border-color: rgba(196, 69, 45, 0.55); }
+  .result.herbivore { border-color: rgba(61, 139, 90, 0.55); }
+  .result.omnivore { border-color: rgba(232, 168, 56, 0.55); }
+
+  .result .diet-tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    margin-bottom: 0.45rem;
+  }
+
+  .result.carnivore .diet-tag {
+    background: rgba(196, 69, 45, 0.25);
+    color: var(--blood-bright);
+  }
+  .result.herbivore .diet-tag {
+    background: rgba(61, 139, 90, 0.25);
+    color: var(--leaf-bright);
+  }
+  .result.omnivore .diet-tag {
+    background: rgba(232, 168, 56, 0.22);
+    color: var(--amber-hot);
+  }
+
+  .result .name {
+    font-size: clamp(1.4rem, 4.5vw, 1.85rem);
+    font-weight: 700;
+    color: var(--bone);
+    line-height: 1.2;
+  }
+
+  .result .flavor {
+    margin-top: 0.5rem;
+    font-size: 0.92rem;
+    color: var(--bone-dim);
+    font-style: italic;
+    line-height: 1.4;
+  }
+
+  .footer {
+    margin-top: 0.5rem;
+    font-size: 0.72rem;
+    color: rgba(184, 169, 144, 0.55);
+    letter-spacing: 0.06em;
+  }
+
+  @media (max-width: 380px) {
+    body { padding: 1rem 0.65rem 2rem; }
+    .filters button { font-size: 0.75rem; padding: 0.4rem 0.7rem; }
+  }
+</style>
+</head>
+<body>
+  <header class="header">
+    <div class="fossil" aria-hidden="true">🦴 · 🌿 · 🔥</div>
+    <h1>What are we playing?</h1>
+    <p class="subtitle">Spin when nobody can decide. · The Isle Babes dinorad</p>
+  </header>
+
+  <div class="filters" role="group" aria-label="Diet filter">
+    <button type="button" data-filter="all" class="active">All</button>
+    <button type="button" data-filter="carnivore">Carnivores</button>
+    <button type="button" data-filter="herbivore">Herbivores</button>
+    <button type="button" data-filter="omnivore">Omnivores</button>
+  </div>
+
+  <div class="stage">
+    <div class="pointer" aria-hidden="true"></div>
+    <canvas id="wheel" width="840" height="840" aria-label="Dinosaur spin wheel"></canvas>
+    <div class="hub" aria-hidden="true"><span>🦖</span></div>
+  </div>
+
+  <div class="controls">
+    <button type="button" id="spinBtn">Spin</button>
+    <div id="result" class="result" aria-live="polite">
+      <div class="diet-tag"></div>
+      <div class="name"></div>
+      <div class="flavor"></div>
+    </div>
+  </div>
+
+  <p class="footer">23 Evrima dinos · offline · no login</p>
+
+<script>
+(function () {
+  "use strict";
+
+  const SPECIES = [
+    { name: "Tyrannosaurus", diet: "carnivore", flavor: "The forest goes quiet. So should you." },
+    { name: "Allosaurus", diet: "carnivore", flavor: "Ambush king. Pick a trail and vanish." },
+    { name: "Carnotaurus", diet: "carnivore", flavor: "Built for speed. Don't stop running." },
+    { name: "Ceratosaurus", diet: "carnivore", flavor: "Horned menace. Own the riverbank." },
+    { name: "Baryonyx", diet: "carnivore", flavor: "Fish first, friends later. Maybe." },
+    { name: "Dilophosaurus", diet: "carnivore", flavor: "Small, loud, and surprisingly sticky." },
+    { name: "Herrerasaurus", diet: "carnivore", flavor: "Tiny terror. Hit and ghost." },
+    { name: "Austroraptor", diet: "carnivore", flavor: "Feathered stalker. Pack up or get packed." },
+    { name: "Troodon", diet: "carnivore", flavor: "Brain over brawn. Outsmart the big ones." },
+    { name: "Omniraptor", diet: "carnivore", flavor: "Swiss-army raptor. Adapt or get eaten." },
+    { name: "Deinosuchus", diet: "carnivore", flavor: "Death from below. Patience is a weapon." },
+    { name: "Pteranodon", diet: "carnivore", flavor: "Sky scout. Spot the drama, then dive in." },
+    { name: "Triceratops", diet: "herbivore", flavor: "Three horns, zero chill. Hold the line." },
+    { name: "Stegosaurus", diet: "herbivore", flavor: "Plates up. Tail ready. Don't mess around." },
+    { name: "Diabloceratops", diet: "herbivore", flavor: "Devil horns. Charge first, ask never." },
+    { name: "Kentrosaurus", diet: "herbivore", flavor: "Spiky attitude in a compact frame." },
+    { name: "Tenontosaurus", diet: "herbivore", flavor: "Mid-tier mainstay. Herd and thrive." },
+    { name: "Maiasaura", diet: "herbivore", flavor: "Good mother energy. Nest, grow, dominate." },
+    { name: "Pachycephalosaurus", diet: "herbivore", flavor: "Headbutt diplomacy. Make contact." },
+    { name: "Dryosaurus", diet: "herbivore", flavor: "Zippy salad. Survive by being annoying." },
+    { name: "Hypsilophodon", diet: "herbivore", flavor: "Pocket herbivore. Speed is your armor." },
+    { name: "Beipiaosaurus", diet: "omnivore", flavor: "Fluffy and flexible. Eat whatever works." },
+    { name: "Gallimimus", diet: "omnivore", flavor: "Roadrunner mode. Never stand still." }
+  ];
+
+  const DIET_COLORS = {
+    carnivore: ["#8b2e22", "#a83828", "#c4452d", "#9a3525", "#b33d28", "#7a281c"],
+    herbivore: ["#2a6b42", "#3d8b5a", "#2f7a4c", "#357a50", "#246038", "#3a8f55"],
+    omnivore: ["#b8861e", "#d4a017", "#c9941a", "#a87818"]
+  };
+
+  const canvas = document.getElementById("wheel");
+  const ctx = canvas.getContext("2d");
+  const spinBtn = document.getElementById("spinBtn");
+  const resultEl = document.getElementById("result");
+  const filterBtns = document.querySelectorAll(".filters button");
+
+  let filter = "all";
+  let pool = SPECIES.slice();
+  let rotation = 0;
+  let spinning = false;
+  let animId = null;
+
+  function getPool() {
+    if (filter === "all") return SPECIES.slice();
+    return SPECIES.filter((s) => s.diet === filter);
+  }
+
+  function colorFor(diet, i) {
+    const palette = DIET_COLORS[diet];
+    return palette[i % palette.length];
+  }
+
+  function drawWheel() {
+    const size = canvas.width;
+    const cx = size / 2;
+    const cy = size / 2;
+    const r = size / 2 - 8;
+    const n = pool.length;
+    const slice = (Math.PI * 2) / n;
+
+    ctx.clearRect(0, 0, size, size);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(rotation);
+
+    for (let i = 0; i < n; i++) {
+      const start = i * slice - Math.PI / 2;
+      const end = start + slice;
+      const sp = pool[i];
+
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, r, start, end);
+      ctx.closePath();
+      ctx.fillStyle = colorFor(sp.diet, i);
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(12, 20, 16, 0.55)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Label
+      ctx.save();
+      ctx.rotate(start + slice / 2);
+      ctx.textAlign = "right";
+      ctx.fillStyle = "#f5efe3";
+      const fontSize = n > 16 ? 18 : n > 10 ? 22 : 26;
+      ctx.font = "bold " + fontSize + "px Georgia, serif";
+      ctx.shadowColor = "rgba(0,0,0,0.65)";
+      ctx.shadowBlur = 4;
+      const label = sp.name.length > 14 ? sp.name.slice(0, 13) + "…" : sp.name;
+      ctx.fillText(label, r - 28, 8);
+      ctx.restore();
+    }
+
+    // Outer ring tick marks
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(232, 168, 56, 0.35)";
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function winnerIndex() {
+    const n = pool.length;
+    const slice = (Math.PI * 2) / n;
+    // Pointer is at top (-PI/2). After rotation, which slice is under the pointer?
+    // Segment i starts at i*slice - PI/2 in unrotated wheel.
+    // After rotation R, a point at angle θ_world maps to θ_world - R on the wheel.
+    // Pointer world angle = -PI/2. Wheel angle under pointer = -PI/2 - R, normalize.
+    let ang = (-Math.PI / 2 - rotation) % (Math.PI * 2);
+    if (ang < 0) ang += Math.PI * 2;
+    // Convert to index: unrotated segment i covers [i*slice - PI/2, ...)
+    // Relative to -PI/2: offset = ang - (-PI/2 + 2PI?) wait.
+    // Unrotated: segment i from (i*slice - PI/2) to ((i+1)*slice - PI/2).
+    // Point at wheel-local angle α (absolute) falls in floor( (α + PI/2) / slice ).
+    // α = (-PI/2 - rotation) mod 2PI — that's the absolute angle on the rotated canvas?
+    // Better approach: normalize rotation so pointer samples angle.
+    // In draw, we rotate by `rotation`, then draw segment i from i*slice - PI/2.
+    // A fixed pointer at top (screen angle -PI/2) hits the wheel at local angle
+    // α = -PI/2 - rotation (mod 2PI).
+    // Index = floor( (α + PI/2) / slice ) mod n = floor( (-rotation) / slice ) mod n
+    let idx = Math.floor(((-rotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / slice);
+    idx = ((idx % n) + n) % n;
+    return idx;
+  }
+
+  function showResult(sp) {
+    resultEl.className = "result show " + sp.diet;
+    resultEl.querySelector(".diet-tag").textContent = sp.diet;
+    resultEl.querySelector(".name").textContent = sp.name;
+    resultEl.querySelector(".flavor").textContent = sp.flavor;
+  }
+
+  function setSpinning(on) {
+    spinning = on;
+    spinBtn.disabled = on;
+    filterBtns.forEach((b) => { b.disabled = on; });
+    spinBtn.textContent = on ? "Spinning…" : "Spin again";
+  }
+
+  function easeOutCubic(t) {
+    return 1 - Math.pow(1 - t, 3);
+  }
+
+  function spin() {
+    if (spinning || pool.length === 0) return;
+    resultEl.classList.remove("show");
+    setSpinning(true);
+
+    const n = pool.length;
+    const slice = (Math.PI * 2) / n;
+    const targetIndex = Math.floor(Math.random() * n);
+    // We want winnerIndex() === targetIndex at end.
+    // idx = floor( ((-rot % 2PI)+2PI)%2PI / slice )
+    // So (-rot) mod 2PI should be in [targetIndex*slice, (targetIndex+1)*slice)
+    // Pick center of slice with small jitter
+    const jitter = (Math.random() - 0.5) * slice * 0.7;
+    const targetLocal = targetIndex * slice + slice / 2 + jitter;
+    // (-rot) mod 2PI === targetLocal  =>  rot ≡ -targetLocal (mod 2PI)
+    const current = ((rotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const desiredMod = ((-targetLocal) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+    let delta = desiredMod - current;
+    if (delta <= 0) delta += Math.PI * 2;
+    const extraTurns = 4 + Math.floor(Math.random() * 3); // 4–6 full spins
+    delta += extraTurns * Math.PI * 2;
+
+    const duration = 2500 + Math.random() * 1500; // 2.5–4s
+    const startRot = rotation;
+    const startTime = performance.now();
+
+    function frame(now) {
+      const t = Math.min(1, (now - startTime) / duration);
+      const e = easeOutCubic(t);
+      rotation = startRot + delta * e;
+      drawWheel();
+      if (t < 1) {
+        animId = requestAnimationFrame(frame);
+      } else {
+        animId = null;
+        const win = pool[winnerIndex()];
+        // Safety: prefer intended target if floating error
+        const intended = pool[targetIndex];
+        showResult(win || intended);
+        setSpinning(false);
+      }
+    }
+    animId = requestAnimationFrame(frame);
+  }
+
+  function applyFilter(next) {
+    if (spinning) return;
+    filter = next;
+    pool = getPool();
+    filterBtns.forEach((b) => {
+      b.classList.toggle("active", b.dataset.filter === filter);
+    });
+    rotation = 0;
+    resultEl.classList.remove("show");
+    spinBtn.textContent = "Spin";
+    drawWheel();
+  }
+
+  filterBtns.forEach((b) => {
+    b.addEventListener("click", () => applyFilter(b.dataset.filter));
+  });
+  spinBtn.addEventListener("click", spin);
+
+  // Init
+  pool = getPool();
+  drawWheel();
+
+  // Expose for headless verify
+  window.__DINORAD__ = {
+    species: SPECIES.map((s) => s.name),
+    count: SPECIES.length,
+    diets: SPECIES.reduce((acc, s) => {
+      acc[s.diet] = (acc[s.diet] || 0) + 1;
+      return acc;
+    }, {})
+  };
+})();
+</script>
+</body>
+</html>
